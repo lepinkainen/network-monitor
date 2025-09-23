@@ -1,0 +1,104 @@
+# Taskfile for Network Monitor project
+# See: https://taskfile.dev/
+version: "3"
+
+vars:
+  BUILD_DIR: build
+  PROJECT_NAME: network-monitor
+  VERSION: 1.0.0
+
+tasks:
+  # Core build task - depends on tests and linting
+  build:
+    desc: Build the project
+    deps: [test, lint]
+    cmds:
+      - task: build-go
+
+  # Linux-specific build
+  build-linux:
+    desc: Build for Linux
+    deps: [test, lint]
+    env:
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - task: build-go
+
+  # CI build without tests/linting (run separately in CI)
+  build-ci:
+    desc: Build for CI/CD (build only)
+    cmds:
+      - task: build-go
+
+  # Test tasks
+  test:
+    desc: Run tests
+    cmds:
+      - task: test-go
+
+  test-ci:
+    desc: Run tests with coverage for CI
+    cmds:
+      - task: test-go-ci
+
+  # Linting tasks
+  lint:
+    desc: Lint code
+    cmds:
+      - task: lint-go
+
+  # Clean build artifacts
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - mkdir -p {{.BUILD_DIR}}
+
+  # Go tasks
+  build-go:
+    desc: Build Go project
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - go build -o {{.BUILD_DIR}}/{{.PROJECT_NAME}} *.go
+
+  test-go:
+    desc: Run Go tests
+    cmds:
+      - go test ./... # Don't use -v flag to save context
+
+  test-go-ci:
+    desc: Run Go tests with coverage for CI
+    cmds:
+      - go test -tags=ci -cover -v ./...
+
+  lint-go:
+    desc: Lint Go code
+    cmds:
+      - goimports -w .
+      - go vet ./...
+      - golangci-lint run # Requires golangci-lint installation
+
+  # Development tasks
+  dev:
+    desc: Start development server
+    cmds:
+      - task: dev-go
+
+  dev-go:
+    desc: Start Go development server
+    cmds:
+      - go run *.go
+
+  # Run the monitor
+  run:
+    desc: Run the network monitor
+    cmds:
+      - ./{{.BUILD_DIR}}/{{.PROJECT_NAME}}
+
+  # Generate reports
+  report:
+    desc: Generate network connectivity report
+    cmds:
+      - mkdir -p reports
+      - ./{{.BUILD_DIR}}/{{.PROJECT_NAME}} --generate-report --output reports/

@@ -24,13 +24,13 @@ func NewReportGenerator(db *sql.DB) *ReportGenerator {
 
 // GenerateReport creates a comprehensive report with charts
 func (r *ReportGenerator) GenerateReport(outputDir string, hours int) error {
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	reportDir := filepath.Join(outputDir, fmt.Sprintf("network_report_%s", timestamp))
-	if err := os.MkdirAll(reportDir, 0755); err != nil {
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create report directory: %w", err)
 	}
 
@@ -166,11 +166,12 @@ func (r *ReportGenerator) generateLatencyChart(outputDir string, hours int) erro
 		if err != nil {
 			return err
 		}
-		defer file.Close()
 
 		if err := graph.Render(chart.PNG, file); err != nil {
+			file.Close()
 			return err
 		}
+		file.Close()
 	}
 
 	return nil
@@ -212,7 +213,7 @@ func (r *ReportGenerator) generateAvailabilityChart(outputDir string, hours int)
 		var target string
 		var uptime float64
 
-		if err := rows.Scan(&hourStr, &target, &uptime); err != nil {
+		if scanErr := rows.Scan(&hourStr, &target, &uptime); scanErr != nil {
 			continue
 		}
 
@@ -354,11 +355,9 @@ func (r *ReportGenerator) generateOutageSummary(outputDir string, hours int) err
 	}
 
 	if len(hourlyOutages) > 0 {
-		var categories []string
 		var values []chart.Value
 
 		for hour, count := range hourlyOutages {
-			categories = append(categories, hour)
 			values = append(values, chart.Value{
 				Label: hour,
 				Value: float64(count),
@@ -432,7 +431,7 @@ func (r *ReportGenerator) generateTextReport(outputDir string, hours int) error 
 	}
 	defer rows.Close()
 
-	fmt.Fprintln(file, "\nOVERALL STATISTICS\n")
+	fmt.Fprintln(file, "\nOVERALL STATISTICS")
 
 	for rows.Next() {
 		var target string
@@ -485,21 +484,21 @@ func (r *ReportGenerator) generateTextReport(outputDir string, hours int) error 
         ORDER BY start_time DESC
     `
 
-	rows, err = r.db.Query(outageQuery, hours)
-	if err != nil {
-		return err
+	outageRows, outageErr := r.db.Query(outageQuery, hours)
+	if outageErr != nil {
+		return outageErr
 	}
-	defer rows.Close()
+	defer outageRows.Close()
 
-	fmt.Fprintln(file, "\nOUTAGE PERIODS (3+ consecutive failures)\n")
+	fmt.Fprintln(file, "\nOUTAGE PERIODS (3+ consecutive failures)")
 
 	outageCount := 0
-	for rows.Next() {
+	for outageRows.Next() {
 		var target string
 		var startTime, endTime time.Time
 		var failedChecks int
 
-		if err := rows.Scan(&target, &startTime, &endTime, &failedChecks); err != nil {
+		if scanErr := outageRows.Scan(&target, &startTime, &endTime, &failedChecks); scanErr != nil {
 			continue
 		}
 
