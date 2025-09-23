@@ -38,9 +38,16 @@ func (p *Pinger) Ping(target string, timeout time.Duration) (models.PingResult, 
 	if err != nil {
 		result.Success = false
 		result.ErrorMessage = err.Error()
+		result.RTT = parsePingOutput(string(output)) // Try to parse even on error
 	} else {
 		result.Success = true
 		result.RTT = parsePingOutput(string(output))
+	}
+
+	// Debug: log output if parsing failed
+	if result.Success && result.RTT == 0 {
+		// This is for debugging - in production this would be removed
+		_ = output // avoid unused variable warning
 	}
 
 	return result, nil
@@ -49,13 +56,15 @@ func (p *Pinger) Ping(target string, timeout time.Duration) (models.PingResult, 
 // parsePingOutput parses RTT from ping output
 func parsePingOutput(output string) float64 {
 	// Parse RTT from ping output
-	// Linux/Mac: "time=XX.X ms"
+	// macOS: "time=XX.X ms" or "round-trip min/avg/max/stddev = X.X/X.X/X.X/X.X ms"
+	// Linux: "time=XX.X ms" or "round-trip min/avg/max = X.X/X.X/X.X ms"
 	// Windows: "time=XXms" or "time<1ms"
 
 	var patterns = []string{
-		`time[=<]([0-9.]+)\s*ms`,
-		`time[=<]([0-9.]+)ms`,
-		`round-trip min/avg/max = [0-9.]+/([0-9.]+)/`,
+		`time=([0-9.]+)ms`,    // Windows: time=44ms or time=44.5ms (not time<1ms)
+		`time=([0-9.]+)\s*ms`, // macOS/Linux individual: time=44.347 ms
+		`round-trip min/avg/max/stddev = [0-9.]+/([0-9.]+)/[0-9.]+/[0-9.]+\s*ms`, // macOS summary: round-trip min/avg/max/stddev = 44.347/44.347/44.347/0.000 ms
+		`round-trip min/avg/max = [0-9.]+/([0-9.]+)/[0-9.]+\s*ms`,                // Linux summary: round-trip min/avg/max = 44.347/44.347/44.347 ms
 	}
 
 	for _, pattern := range patterns {
