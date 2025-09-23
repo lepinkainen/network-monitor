@@ -42,7 +42,7 @@ A focused Go-based network connectivity monitoring solution designed for long-te
 - **Continuous Monitoring**: Configurable ping intervals to multiple targets
 - **Real-time Dashboard**: Web interface at localhost:8080 with live charts
 - **Pattern Detection**: 24-hour heatmap overlay showing issue patterns across days
-- **Outage Tracking**: Automatic detection of connectivity failures (3+ consecutive pings)
+- **Outage Tracking**: Automatic detection of connectivity failures (5+ failed pings in any 10 consecutive pings)
 - **Static Reports**: PNG chart generation for ISP evidence documentation
 - **Data Management**: Automatic maintenance with configurable retention periods
 

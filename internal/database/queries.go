@@ -91,28 +91,45 @@ func (db *DB) GetStats(hours int) ([]models.Stats, error) {
 	return stats, nil
 }
 
-// GetOutages retrieves detected outages
+// GetOutages retrieves detected outages using sliding window approach
 func (db *DB) GetOutages(days int) ([]models.Outage, error) {
 	query := `
-        WITH outage_groups AS (
+        WITH windowed_pings AS (
             SELECT
                 target,
                 timestamp,
                 success,
-                ROW_NUMBER() OVER (PARTITION BY target ORDER BY timestamp) -
-                ROW_NUMBER() OVER (PARTITION BY target, success ORDER BY timestamp) as grp
+                COUNT(*) OVER (
+                    PARTITION BY target
+                    ORDER BY timestamp
+                    ROWS 9 PRECEDING
+                ) as window_size,
+                SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) OVER (
+                    PARTITION BY target
+                    ORDER BY timestamp
+                    ROWS 9 PRECEDING
+                ) as failure_count
             FROM ping_results
             WHERE timestamp > datetime('now', '-' || ? || ' days')
+        ),
+        outage_periods AS (
+            SELECT
+                target,
+                timestamp,
+                success,
+                CASE WHEN failure_count >= 5 AND window_size = 10 THEN 1 ELSE 0 END as is_outage,
+                ROW_NUMBER() OVER (PARTITION BY target ORDER BY timestamp) -
+                ROW_NUMBER() OVER (PARTITION BY target, CASE WHEN failure_count >= 5 AND window_size = 10 THEN 1 ELSE 0 END ORDER BY timestamp) as outage_grp
+            FROM windowed_pings
         )
         SELECT
             target,
             MIN(timestamp) as start_time,
             MAX(timestamp) as end_time,
             COUNT(*) as failed_checks
-        FROM outage_groups
-        WHERE success = 0
-        GROUP BY target, grp
-        HAVING COUNT(*) >= 3  -- At least 3 consecutive failures
+        FROM outage_periods
+        WHERE is_outage = 1
+        GROUP BY target, outage_grp
         ORDER BY start_time DESC
         LIMIT 100
     `
