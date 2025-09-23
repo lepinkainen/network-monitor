@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Network Connectivity Monitor</title>
+    <title>Network Connectivity Monitor2</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
       * {
@@ -347,6 +347,96 @@
         });
       }
 
+      // Enhanced data aggregation function
+      function aggregateData(data, hours) {
+        // Determine aggregation interval based on time range
+        let intervalMinutes;
+        if (hours <= 1) {
+          intervalMinutes = 0.5; // 30-second intervals for very short ranges
+        } else if (hours <= 6) {
+          intervalMinutes = 2; // 2-minute intervals for short ranges
+        } else if (hours <= 24) {
+          intervalMinutes = 5; // 5-minute intervals for 24 hours
+        } else if (hours <= 72) {
+          intervalMinutes = 15; // 15-minute intervals for 3 days
+        } else {
+          intervalMinutes = 60; // 1-hour intervals for longer ranges
+        }
+
+        const intervalMs = intervalMinutes * 60 * 1000;
+        const aggregated = {};
+
+        // Include both successful and failed pings for better analysis
+        data.forEach((d) => {
+          const bucketKey =
+            Math.floor(d.date.getTime() / intervalMs) * intervalMs;
+          const targetKey = d.target;
+
+          if (!aggregated[targetKey]) {
+            aggregated[targetKey] = {};
+          }
+
+          if (!aggregated[targetKey][bucketKey]) {
+            aggregated[targetKey][bucketKey] = {
+              date: new Date(bucketKey),
+              values: [],
+              failures: 0,
+              total: 0,
+            };
+          }
+
+          aggregated[targetKey][bucketKey].total++;
+
+          if (d.success && d.rtt_ms > 0) {
+            aggregated[targetKey][bucketKey].values.push(d.rtt_ms);
+          } else {
+            aggregated[targetKey][bucketKey].failures++;
+          }
+        });
+
+        // Convert to final format with statistics
+        const result = {};
+        Object.keys(aggregated).forEach((target) => {
+          result[target] = Object.values(aggregated[target])
+            .map((bucket) => {
+              const values = bucket.values;
+              const successRate = values.length / bucket.total;
+
+              if (values.length === 0) {
+                return {
+                  date: bucket.date,
+                  avg: null,
+                  min: null,
+                  max: null,
+                  p95: null,
+                  count: bucket.total,
+                  successRate: successRate,
+                  hasData: false,
+                };
+              }
+
+              const sorted = values.sort((a, b) => a - b);
+              const p95Index = Math.floor(sorted.length * 0.95);
+
+              return {
+                date: bucket.date,
+                avg: d3.mean(values),
+                min: d3.min(values),
+                max: d3.max(values),
+                p95: sorted[p95Index] || d3.max(values),
+                median: d3.median(values),
+                count: bucket.total,
+                successCount: values.length,
+                successRate: successRate,
+                hasData: true,
+              };
+            })
+            .sort((a, b) => a.date - b.date);
+        });
+
+        return result;
+      }
+
       function drawLatencyChart() {
         const container = d3.select("#latency-chart");
         container.selectAll("*").remove();
@@ -366,7 +456,7 @@
           .append("g")
           .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        // Parse and group data
+        // Parse timestamps
         const parseTime = d3.timeParse("%Y-%m-%dT%H:%M:%S");
         currentData.forEach((d) => {
           if (d.timestamp) {
@@ -374,34 +464,52 @@
           }
         });
 
-        const targets = [...new Set(currentData.map((d) => d.target))];
-        const dataByTarget = targets.map((target) => {
-          return {
-            target: target,
-            values: currentData
-              .filter((d) => d.target === target && d.success)
-              .map((d) => ({ date: d.date, value: d.rtt_ms }))
-              .sort((a, b) => a.date - b.date),
-          };
-        });
+        // Get current time range and aggregate data
+        const hours = parseInt(document.getElementById("timeRange").value);
+        const aggregatedData = aggregateData(currentData, hours);
+
+        const targets = Object.keys(aggregatedData);
+        if (targets.length === 0) {
+          g.append("text")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+            .attr("text-anchor", "middle")
+            .style("font-size", "14px")
+            .style("fill", "#999")
+            .text("No data available for the selected time range");
+          return;
+        }
+
+        const dataByTarget = targets.map((target) => ({
+          target: target,
+          values: aggregatedData[target].filter((d) => d.hasData),
+        }));
+
+        // Filter out targets with no data
+        const validTargets = dataByTarget.filter((d) => d.values.length > 0);
+        if (validTargets.length === 0) {
+          g.append("text")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+            .attr("text-anchor", "middle")
+            .style("font-size", "14px")
+            .style("fill", "#999")
+            .text("No latency data available for the selected time range");
+          return;
+        }
 
         // Scales
+        const allValidValues = validTargets.flatMap((d) => d.values);
         const x = d3
           .scaleTime()
-          .domain(d3.extent(currentData, (d) => d.date))
+          .domain(d3.extent(allValidValues, (d) => d.date))
           .range([0, width]);
 
-        const y = d3
-          .scaleLinear()
-          .domain([
-            0,
-            d3.max(
-              currentData.filter((d) => d.success),
-              (d) => d.rtt_ms
-            ),
-          ])
-          .nice()
-          .range([height, 0]);
+        // Smart Y-axis scaling - use 95th percentile to avoid outlier skewing
+        const maxLatencies = allValidValues.map((d) => d.p95 || d.avg);
+        const yMax = d3.quantile(maxLatencies.sort(d3.ascending), 0.95) * 1.1;
+
+        const y = d3.scaleLinear().domain([0, yMax]).nice().range([height, 0]);
 
         // Grid
         g.append("g")
@@ -431,57 +539,138 @@
           .style("font-size", "12px")
           .text("Latency (ms)");
 
-        // Line generator
+        // Line generator for average latency
         const line = d3
           .line()
           .x((d) => x(d.date))
-          .y((d) => y(d.value))
-          .curve(d3.curveMonotoneX);
+          .y((d) => y(d.avg))
+          .curve(d3.curveMonotoneX)
+          .defined((d) => d.hasData && d.avg !== null);
 
-        // Draw lines
-        const lines = g
-          .selectAll(".line-group")
-          .data(dataByTarget)
-          .enter()
-          .append("g")
-          .attr("class", "line-group");
+        // Area generator for confidence bands (min/max range)
+        const area = d3
+          .area()
+          .x((d) => x(d.date))
+          .y0((d) => y(Math.min(d.min, yMax)))
+          .y1((d) => y(Math.min(d.max, yMax)))
+          .curve(d3.curveMonotoneX)
+          .defined((d) => d.hasData && d.min !== null && d.max !== null);
 
-        lines
-          .append("path")
-          .attr("class", "line")
-          .attr("d", (d) => line(d.values))
-          .style("stroke", (d) => colorScale(d.target));
+        // Draw confidence bands (min/max range) for each target
+        validTargets.forEach((targetData) => {
+          g.append("path")
+            .datum(targetData.values)
+            .attr("class", "confidence-band")
+            .attr("d", area)
+            .style("fill", colorScale(targetData.target))
+            .style("opacity", 0.15)
+            .style("stroke", "none");
+        });
 
-        // Add dots
-        lines
-          .selectAll(".dot")
-          .data((d) => d.values.map((v) => ({ ...v, target: d.target })))
-          .enter()
-          .append("circle")
-          .attr("class", "dot")
-          .attr("cx", (d) => x(d.date))
-          .attr("cy", (d) => y(d.value))
-          .attr("r", 3)
-          .style("fill", (d) => colorScale(d.target))
-          .on("mouseover", function (event, d) {
-            tooltip
-              .style("opacity", 1)
-              .html(
-                `${d.target}<br/>RTT: ${d.value.toFixed(
+        // Draw average lines for each target
+        validTargets.forEach((targetData) => {
+          g.append("path")
+            .datum(targetData.values)
+            .attr("class", "line")
+            .attr("d", line)
+            .style("stroke", colorScale(targetData.target))
+            .style("stroke-width", 2)
+            .style("fill", "none");
+        });
+
+        // Add interactive dots for hover
+        validTargets.forEach((targetData) => {
+          g.selectAll(`.dots-${targetData.target.replace(/\./g, "-")}`)
+            .data(targetData.values)
+            .enter()
+            .append("circle")
+            .attr("class", `dots-${targetData.target.replace(/\./g, "-")}`)
+            .attr("cx", (d) => x(d.date))
+            .attr("cy", (d) => y(d.avg))
+            .attr("r", 4)
+            .style("fill", colorScale(targetData.target))
+            .style("stroke", "white")
+            .style("stroke-width", 2)
+            .style("opacity", 0)
+            .on("mouseover", function (event, d) {
+              // Highlight this dot
+              d3.select(this).style("opacity", 1);
+
+              // Show tooltip
+              const successPercent = (d.successRate * 100).toFixed(1);
+              tooltip.style("opacity", 1).html(
+                `<strong>${targetData.target}</strong><br/>
+                <strong>Average:</strong> ${d.avg.toFixed(1)} ms<br/>
+                <strong>Median:</strong> ${d.median.toFixed(1)} ms<br/>
+                <strong>Range:</strong> ${d.min.toFixed(1)} - ${d.max.toFixed(
                   1
-                )} ms<br/>${d3.timeFormat("%H:%M:%S")(d.date)}`
+                )} ms<br/>
+                <strong>95th percentile:</strong> ${d.p95.toFixed(1)} ms<br/>
+                <strong>Success rate:</strong> ${successPercent}%<br/>
+                <strong>Samples:</strong> ${d.successCount}/${d.count}<br/>
+                <strong>Time:</strong> ${d3.timeFormat("%H:%M")(d.date)}`
               );
-          })
+            })
+            .on("mousemove", function (event) {
+              tooltip
+                .style("left", event.pageX + 10 + "px")
+                .style("top", event.pageY - 28 + "px");
+            })
+            .on("mouseout", function () {
+              d3.select(this).style("opacity", 0);
+              tooltip.style("opacity", 0);
+            });
+        });
+
+        // Add hover line for better time reference
+        const hoverLine = g
+          .append("line")
+          .attr("class", "hover-line")
+          .style("stroke", "#999")
+          .style("stroke-width", 1)
+          .style("stroke-dasharray", "3,3")
+          .style("opacity", 0);
+
+        // Invisible overlay for mouse tracking
+        g.append("rect")
+          .attr("width", width)
+          .attr("height", height)
+          .style("fill", "none")
+          .style("pointer-events", "all")
           .on("mousemove", function (event) {
-            tooltip
-              .style("left", event.pageX + 10 + "px")
-              .style("top", event.pageY - 28 + "px");
+            const [mouseX] = d3.pointer(event);
+            const xDate = x.invert(mouseX);
+
+            // Show hover line
+            hoverLine
+              .attr("x1", mouseX)
+              .attr("x2", mouseX)
+              .attr("y1", 0)
+              .attr("y2", height)
+              .style("opacity", 0.5);
+
+            // Find closest data points and highlight them
+            validTargets.forEach((targetData) => {
+              const bisect = d3.bisector((d) => d.date).left;
+              const i = bisect(targetData.values, xDate, 1);
+              const d0 = targetData.values[i - 1];
+              const d1 = targetData.values[i];
+
+              if (d0 && d1) {
+                const d = xDate - d0.date > d1.date - xDate ? d1 : d0;
+                g.selectAll(
+                  `.dots-${targetData.target.replace(/\./g, "-")}`
+                ).style("opacity", (dot) => (dot === d ? 1 : 0));
+              }
+            });
           })
-          .on("mouseout", function () {
+          .on("mouseleave", function () {
+            hoverLine.style("opacity", 0);
+            g.selectAll("[class*='dots-']").style("opacity", 0);
             tooltip.style("opacity", 0);
           });
 
-        // Legend
+        // Enhanced Legend with toggle functionality
         const legend = svg
           .append("g")
           .attr("class", "legend")
@@ -490,24 +679,70 @@
             `translate(${width + margin.left + 10}, ${margin.top})`
           );
 
-        targets.forEach((target, i) => {
+        validTargets.forEach((targetData, i) => {
           const legendRow = legend
             .append("g")
-            .attr("transform", `translate(0, ${i * 20})`);
+            .attr("transform", `translate(0, ${i * 25})`)
+            .style("cursor", "pointer");
 
           legendRow
             .append("rect")
-            .attr("width", 10)
-            .attr("height", 10)
-            .attr("fill", colorScale(target));
+            .attr("width", 12)
+            .attr("height", 12)
+            .attr("fill", colorScale(targetData.target))
+            .attr("rx", 2);
 
           legendRow
             .append("text")
-            .attr("x", 15)
-            .attr("y", 10)
+            .attr("x", 18)
+            .attr("y", 9)
             .style("font-size", "12px")
-            .text(target);
+            .style("dominant-baseline", "middle")
+            .text(targetData.target);
+
+          // Add stats to legend
+          const avgLatency = d3.mean(targetData.values, (d) => d.avg);
+          const avgSuccess =
+            d3.mean(targetData.values, (d) => d.successRate) * 100;
+
+          legendRow
+            .append("text")
+            .attr("x", 18)
+            .attr("y", 21)
+            .style("font-size", "10px")
+            .style("fill", "#666")
+            .text(`${avgLatency.toFixed(1)}ms, ${avgSuccess.toFixed(1)}% up`);
+
+          // Toggle functionality
+          let visible = true;
+          legendRow.on("click", function () {
+            visible = !visible;
+            const opacity = visible ? 1 : 0.1;
+
+            // Toggle line visibility
+            g.selectAll(".line")
+              .filter((d, j) => j === i)
+              .style("opacity", opacity);
+
+            // Toggle confidence band visibility
+            g.selectAll(".confidence-band")
+              .filter((d, j) => j === i)
+              .style("opacity", visible ? 0.15 : 0.02);
+
+            // Update legend appearance
+            legendRow.select("rect").style("opacity", opacity);
+            legendRow.selectAll("text").style("opacity", opacity);
+          });
         });
+
+        // Add chart info
+        g.append("text")
+          .attr("x", width)
+          .attr("y", -5)
+          .attr("text-anchor", "end")
+          .style("font-size", "11px")
+          .style("fill", "#666")
+          .text("Click legend items to toggle • Hover for details");
       }
 
       function drawAvailabilityChart() {
