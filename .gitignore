@@ -1,0 +1,32 @@
+# Binaries
+network-monitor
+*.exe
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Log files
+*.log
+
+# Reports directory
+reports/
+report_*/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go dependencies
+vendor/
+
+# Test files
+*.test
+*.out
