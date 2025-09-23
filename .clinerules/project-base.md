@@ -10,19 +10,26 @@ A focused Go-based network connectivity monitoring solution designed for long-te
 - **Database**: SQLite (modernc.org/sqlite driver)
 - **Frontend**: HTML/CSS/JavaScript with D3.js for visualizations
 - **Chart Generation**: go-chart/v2 library for static PNG reports
-- **Build System**: Standard Go build with bash scripts
+- **Build System**: Taskfile.yml for build management and automation
 
 ## Architecture
 
-- **Main Application**: Single Go binary (`main.go`) with embedded static web assets
+- **Main Application**: Go module with entry point at `cmd/monitor/main.go`, embedded static web assets
+- **Internal Packages**: Modular design with `internal/` packages for separation of concerns
 - **Database Layer**: SQLite with multiple tables for ping results, outages, and aggregated patterns
 - **Web Interface**: REST API serving data to D3.js-based dashboard
-- **Report Generation**: Separate module (`report.go`) for static PNG chart generation
+- **Report Generation**: `internal/report/` package for static PNG chart generation
 
 ## Key Components
 
-- **main.go**: Core monitoring logic, ping workers, web server, database management
-- **report.go**: Chart generation using go-chart library
+- **cmd/monitor/main.go**: Core monitoring logic, ping workers, web server, database management
+- **internal/config/**: Configuration management (config.go, flags.go)
+- **internal/database/**: Database operations and schema (db.go, maintenance.go, queries.go)
+- **internal/models/**: Data models (ping.go, stats.go, types.go)
+- **internal/monitor/**: Monitoring lifecycle and workers (lifecycle.go, monitor.go, worker.go)
+- **internal/ping/**: Ping implementation (ping.go)
+- **internal/report/**: Chart generation using go-chart library (charts.go, generator.go, text.go, utils.go)
+- **internal/web/**: Web server and API handlers (handlers.go, server.go)
 - **static/index.html**: Web dashboard with real-time visualizations
 - **Database Tables**:
   - `ping_results`: Raw ping data (7-day retention)
@@ -49,7 +56,7 @@ A focused Go-based network connectivity monitoring solution designed for long-te
 
 ## Deployment
 
-- **Build**: Simple `go build` command
+- **Build**: `task build` command (or `go build ./cmd/monitor`)
 - **Run**: Executable binary with optional flags
 - **Service**: Can be configured as macOS launchd service or systemd service
 - **Resource Usage**: Low CPU/memory footprint suitable for continuous operation
@@ -112,4 +119,4 @@ A focused Go-based network connectivity monitoring solution designed for long-te
 - RESTful API design with JSON responses
 - D3.js for interactive data visualizations
 - SQLite WAL mode for concurrent access
-- LLM-shared submodule provides development tools and guidelines
+- llm-shared submodule provides development tools and guidelines

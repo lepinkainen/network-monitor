@@ -1,70 +1,25 @@
-package main
+package report
 
 import (
-	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/wcharczuk/go-chart/v2"
 	"github.com/wcharczuk/go-chart/v2/drawing"
 )
 
-// ReportGenerator creates static images and reports for ISP evidence
-type ReportGenerator struct {
-	db *sql.DB
-}
-
-func NewReportGenerator(db *sql.DB) *ReportGenerator {
-	return &ReportGenerator{db: db}
-}
-
-// GenerateReport creates a comprehensive report with charts
-func (r *ReportGenerator) GenerateReport(outputDir string, hours int) error {
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-
-	timestamp := time.Now().Format("2006-01-02_15-04-05")
-	reportDir := filepath.Join(outputDir, fmt.Sprintf("network_report_%s", timestamp))
-	if err := os.MkdirAll(reportDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create report directory: %w", err)
-	}
-
-	// Generate various charts
-	if err := r.generateLatencyChart(reportDir, hours); err != nil {
-		log.Printf("Failed to generate latency chart: %v", err)
-	}
-
-	if err := r.generateAvailabilityChart(reportDir, hours); err != nil {
-		log.Printf("Failed to generate availability chart: %v", err)
-	}
-
-	if err := r.generateOutageSummary(reportDir, hours); err != nil {
-		log.Printf("Failed to generate outage summary: %v", err)
-	}
-
-	if err := r.generateTextReport(reportDir, hours); err != nil {
-		log.Printf("Failed to generate text report: %v", err)
-	}
-
-	log.Printf("Report generated in: %s", reportDir)
-	return nil
-}
-
-func (r *ReportGenerator) generateLatencyChart(outputDir string, hours int) error {
+func (g *Generator) generateLatencyChart(outputDir string, hours int) error {
 	query := `
         SELECT timestamp, target, rtt_ms
         FROM ping_results
-        WHERE success = 1 
+        WHERE success = 1
         AND timestamp > datetime('now', '-' || ? || ' hours')
         ORDER BY timestamp
     `
 
-	rows, err := r.db.Query(query, hours)
+	rows, err := g.db.Query(query, hours)
 	if err != nil {
 		return err
 	}
@@ -177,10 +132,10 @@ func (r *ReportGenerator) generateLatencyChart(outputDir string, hours int) erro
 	return nil
 }
 
-func (r *ReportGenerator) generateAvailabilityChart(outputDir string, hours int) error {
+func (g *Generator) generateAvailabilityChart(outputDir string, hours int) error {
 	query := `
         WITH hourly_stats AS (
-            SELECT 
+            SELECT
                 strftime('%Y-%m-%d %H:00:00', timestamp) as hour,
                 target,
                 COUNT(*) as total,
@@ -190,14 +145,14 @@ func (r *ReportGenerator) generateAvailabilityChart(outputDir string, hours int)
             GROUP BY hour, target
             ORDER BY hour
         )
-        SELECT 
-            hour, 
+        SELECT
+            hour,
             target,
             (CAST(successful AS REAL) / total) * 100 as uptime_percent
         FROM hourly_stats
     `
 
-	rows, err := r.db.Query(query, hours)
+	rows, err := g.db.Query(query, hours)
 	if err != nil {
 		return err
 	}
@@ -297,11 +252,11 @@ func (r *ReportGenerator) generateAvailabilityChart(outputDir string, hours int)
 	return graph.Render(chart.PNG, file)
 }
 
-func (r *ReportGenerator) generateOutageSummary(outputDir string, hours int) error {
+func (g *Generator) generateOutageSummary(outputDir string, hours int) error {
 	// Query for outage periods
 	query := `
         WITH outage_detection AS (
-            SELECT 
+            SELECT
                 target,
                 timestamp,
                 success,
@@ -311,10 +266,10 @@ func (r *ReportGenerator) generateOutageSummary(outputDir string, hours int) err
             WHERE timestamp > datetime('now', '-' || ? || ' hours')
         ),
         outage_events AS (
-            SELECT 
+            SELECT
                 target,
                 timestamp,
-                CASE 
+                CASE
                     WHEN success = 0 AND prev_success = 1 THEN 'start'
                     WHEN success = 0 AND next_success = 1 THEN 'end'
                     WHEN success = 0 THEN 'ongoing'
@@ -326,7 +281,7 @@ func (r *ReportGenerator) generateOutageSummary(outputDir string, hours int) err
         ORDER BY timestamp
     `
 
-	rows, err := r.db.Query(query, hours)
+	rows, err := g.db.Query(query, hours)
 	if err != nil {
 		return err
 	}
@@ -396,145 +351,4 @@ func (r *ReportGenerator) generateOutageSummary(outputDir string, hours int) err
 	}
 
 	return nil
-}
-
-func (r *ReportGenerator) generateTextReport(outputDir string, hours int) error {
-	filename := filepath.Join(outputDir, "summary.txt")
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	fmt.Fprintf(file, "Network Connectivity Report\n")
-	fmt.Fprintf(file, "Generated: %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(file, "Period: Last %d hours\n\n", hours)
-	fmt.Fprintln(file, strings.Repeat("=", 60))
-
-	// Overall statistics
-	query := `
-        SELECT 
-            target,
-            COUNT(*) as total_pings,
-            SUM(CASE WHEN success THEN 1 ELSE 0 END) as successful_pings,
-            AVG(CASE WHEN success THEN rtt_ms ELSE NULL END) as avg_rtt,
-            MAX(CASE WHEN success THEN rtt_ms ELSE NULL END) as max_rtt,
-            MIN(CASE WHEN success THEN rtt_ms ELSE NULL END) as min_rtt
-        FROM ping_results
-        WHERE timestamp > datetime('now', '-' || ? || ' hours')
-        GROUP BY target
-    `
-
-	rows, err := r.db.Query(query, hours)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	fmt.Fprintln(file, "\nOVERALL STATISTICS")
-
-	for rows.Next() {
-		var target string
-		var total, successful int
-		var avgRTT, maxRTT, minRTT sql.NullFloat64
-
-		if err := rows.Scan(&target, &total, &successful, &avgRTT, &maxRTT, &minRTT); err != nil {
-			continue
-		}
-
-		uptime := float64(successful) / float64(total) * 100
-		packetLoss := 100 - uptime
-
-		fmt.Fprintf(file, "Target: %s\n", target)
-		fmt.Fprintf(file, "  Total Pings: %d\n", total)
-		fmt.Fprintf(file, "  Successful: %d (%.2f%%)\n", successful, uptime)
-		fmt.Fprintf(file, "  Packet Loss: %.2f%%\n", packetLoss)
-
-		if avgRTT.Valid {
-			fmt.Fprintf(file, "  Average RTT: %.2f ms\n", avgRTT.Float64)
-			fmt.Fprintf(file, "  Min RTT: %.2f ms\n", minRTT.Float64)
-			fmt.Fprintf(file, "  Max RTT: %.2f ms\n", maxRTT.Float64)
-		}
-		fmt.Fprintln(file)
-	}
-
-	fmt.Fprintln(file, strings.Repeat("=", 60))
-
-	// Outage periods
-	outageQuery := `
-        WITH grouped_failures AS (
-            SELECT 
-                target,
-                timestamp,
-                success,
-                ROW_NUMBER() OVER (PARTITION BY target ORDER BY timestamp) -
-                ROW_NUMBER() OVER (PARTITION BY target, success ORDER BY timestamp) as grp
-            FROM ping_results
-            WHERE timestamp > datetime('now', '-' || ? || ' hours')
-        )
-        SELECT 
-            target,
-            MIN(timestamp) as start_time,
-            MAX(timestamp) as end_time,
-            COUNT(*) as failed_checks
-        FROM grouped_failures
-        WHERE success = 0
-        GROUP BY target, grp
-        HAVING COUNT(*) >= 3
-        ORDER BY start_time DESC
-    `
-
-	outageRows, outageErr := r.db.Query(outageQuery, hours)
-	if outageErr != nil {
-		return outageErr
-	}
-	defer outageRows.Close()
-
-	fmt.Fprintln(file, "\nOUTAGE PERIODS (3+ consecutive failures)")
-
-	outageCount := 0
-	for outageRows.Next() {
-		var target string
-		var startTime, endTime time.Time
-		var failedChecks int
-
-		if scanErr := outageRows.Scan(&target, &startTime, &endTime, &failedChecks); scanErr != nil {
-			continue
-		}
-
-		duration := endTime.Sub(startTime)
-		fmt.Fprintf(file, "Outage #%d\n", outageCount+1)
-		fmt.Fprintf(file, "  Target: %s\n", target)
-		fmt.Fprintf(file, "  Start: %s\n", startTime.Format("2006-01-02 15:04:05"))
-		fmt.Fprintf(file, "  End: %s\n", endTime.Format("2006-01-02 15:04:05"))
-		fmt.Fprintf(file, "  Duration: %s\n", duration)
-		fmt.Fprintf(file, "  Failed Checks: %d\n", failedChecks)
-		fmt.Fprintln(file)
-
-		outageCount++
-	}
-
-	if outageCount == 0 {
-		fmt.Fprintln(file, "No significant outages detected.")
-	} else {
-		fmt.Fprintf(file, "\nTotal Outages: %d\n", outageCount)
-	}
-
-	fmt.Fprintln(file, strings.Repeat("=", 60))
-	fmt.Fprintln(file, "\nThis report documents network connectivity issues.")
-	fmt.Fprintln(file, "Charts and detailed data are available in the accompanying files.")
-
-	return nil
-}
-
-func sanitizeFilename(s string) string {
-	// Replace dots and special characters for safe filenames
-	replacer := strings.NewReplacer(
-		".", "_",
-		":", "_",
-		"/", "_",
-		"\\", "_",
-		" ", "_",
-	)
-	return replacer.Replace(s)
 }
