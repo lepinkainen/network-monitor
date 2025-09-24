@@ -12,16 +12,27 @@
   min-width: 700px;
 }
 
+/* Availability timeline container adjustments for multi-row grid */
+.chart-container:has(#availability-chart) {
+  overflow-x: auto;
+  /* Allow container to expand for large grids */
+  min-width: 600px;
+}
+
 .chart-container h2 {
   font-size: 20px;
   color: #333;
   margin-bottom: 20px;
 }
 
-#latency-chart,
-#availability-chart {
+#latency-chart {
   width: 100%;
   height: 300px;
+}
+
+#availability-chart {
+  width: 100%;
+  /* Height is now dynamic based on grid size - no fixed height */
 }
 
 .axis {
@@ -66,4 +77,20 @@
 
 .heatmap-legend {
   font-size: 12px;
+}
+
+.ping-cell {
+  stroke: white;
+  stroke-width: 0.5;
+  cursor: pointer;
+}
+
+.ping-cell:hover {
+  stroke: #333;
+  stroke-width: 1;
+}
+
+.time-marker {
+  font-size: 10px;
+  fill: #666;
 }
