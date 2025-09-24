@@ -9,8 +9,8 @@ func (db *DB) AggregateHourlyPatterns() error {
 	query := `
         INSERT OR REPLACE INTO hourly_patterns (date, hour, target, total_pings, failed_pings, avg_rtt_ms, max_rtt_ms, failure_rate)
         SELECT
-            strftime('%Y-%m-%d', timestamp) as date,
-            CAST(strftime('%H', timestamp) AS INTEGER) as hour,
+            substr(timestamp, 1, 10) as date,
+            CAST(substr(timestamp, 12, 2) AS INTEGER) as hour,
             target,
             COUNT(*) as total_pings,
             SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) as failed_pings,
@@ -18,8 +18,8 @@ func (db *DB) AggregateHourlyPatterns() error {
             MAX(CASE WHEN success THEN rtt_ms ELSE NULL END) as max_rtt_ms,
             ROUND((SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as failure_rate
         FROM ping_results
-        WHERE timestamp > datetime('now', '-2 days')
-        AND strftime('%Y-%m-%d', timestamp) IS NOT NULL
+        WHERE timestamp > datetime('now', '-7 days')
+        AND length(timestamp) > 19
         GROUP BY date, hour, target
     `
 	_, err := db.Exec(query)
@@ -69,4 +69,36 @@ func (db *DB) ArchiveOldData() error {
 	}
 
 	return nil
+}
+
+// BackfillHourlyPatterns backfills hourly patterns from all available ping_results data
+// This is useful for initial population or when the hourly_patterns table is empty
+func (db *DB) BackfillHourlyPatterns() error {
+	query := `
+        INSERT OR REPLACE INTO hourly_patterns (date, hour, target, total_pings, failed_pings, avg_rtt_ms, max_rtt_ms, failure_rate)
+        SELECT
+            substr(timestamp, 1, 10) as date,
+            CAST(substr(timestamp, 12, 2) AS INTEGER) as hour,
+            target,
+            COUNT(*) as total_pings,
+            SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) as failed_pings,
+            AVG(CASE WHEN success THEN rtt_ms ELSE NULL END) as avg_rtt_ms,
+            MAX(CASE WHEN success THEN rtt_ms ELSE NULL END) as max_rtt_ms,
+            ROUND((SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as failure_rate
+        FROM ping_results
+        WHERE length(timestamp) > 19
+        GROUP BY date, hour, target
+    `
+	_, err := db.Exec(query)
+	return err
+}
+
+// IsHourlyPatternsEmpty checks if the hourly_patterns table is empty
+func (db *DB) IsHourlyPatternsEmpty() (bool, error) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM hourly_patterns").Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count == 0, nil
 }

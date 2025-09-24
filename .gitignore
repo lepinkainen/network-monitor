@@ -30,3 +30,5 @@ vendor/
 # Test files
 *.test
 *.out
+.playwright-mcp/
+

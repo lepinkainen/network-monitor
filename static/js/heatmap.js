@@ -15,11 +15,16 @@ function drawHeatmap() {
     return;
   }
 
-  const margin = { top: 50, right: 150, bottom: 50, left: 100 };
-  const width =
-    container.node().getBoundingClientRect().width - margin.left - margin.right;
-  const cellSize = Math.floor(width / 24);
+  const margin = { top: 60, right: 180, bottom: 80, left: 120 };
+  const containerWidth = container.node().getBoundingClientRect().width;
+
+  // Ensure minimum cell size for readability
+  const minCellSize = 25;
+  const maxCellSize = 35;
+  let cellSize = Math.max(minCellSize, Math.min(maxCellSize, Math.floor((containerWidth - margin.left - margin.right) / 24)));
+
   const targets = [...new Set(heatmapData.map((d) => d.target))];
+  const width = cellSize * 24;
   const height = cellSize * targets.length;
 
   const svg = container

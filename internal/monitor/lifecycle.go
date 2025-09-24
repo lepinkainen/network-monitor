@@ -33,11 +33,15 @@ func (m *Monitor) performMaintenance() {
 	// Aggregate hourly patterns for heatmap
 	if err := m.db.AggregateHourlyPatterns(); err != nil {
 		log.Printf("Failed to aggregate hourly patterns: %v", err)
+	} else {
+		log.Println("Successfully aggregated hourly patterns")
 	}
 
 	// Archive old detailed data (keep raw data for 7 days, aggregated for 90 days)
 	if err := m.db.ArchiveOldData(); err != nil {
 		log.Printf("Failed to archive old data: %v", err)
+	} else {
+		log.Println("Successfully archived old data")
 	}
 
 	log.Println("Maintenance complete")

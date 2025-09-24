@@ -6,6 +6,12 @@
   margin-bottom: 20px;
 }
 
+/* Special handling for heatmap to allow horizontal scrolling if needed */
+.chart-container:has(#heatmap-chart) {
+  overflow-x: auto;
+  min-width: 700px;
+}
+
 .chart-container h2 {
   font-size: 20px;
   color: #333;
@@ -53,8 +59,9 @@
 }
 
 .heatmap-label {
-  font-size: 11px;
-  fill: #666;
+  font-size: 12px;
+  fill: #444;
+  font-weight: 500;
 }
 
 .heatmap-legend {

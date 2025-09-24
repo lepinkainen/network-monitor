@@ -36,6 +36,18 @@ func main() {
 		log.Fatalf("Failed to initialize database schema: %v", err)
 	}
 
+	// Backfill hourly patterns if table is empty (for initial population)
+	if isEmpty, err := db.IsHourlyPatternsEmpty(); err != nil {
+		log.Printf("Warning: Failed to check hourly patterns table: %v", err)
+	} else if isEmpty {
+		log.Println("Hourly patterns table is empty, backfilling from existing ping data...")
+		if err := db.BackfillHourlyPatterns(); err != nil {
+			log.Printf("Warning: Failed to backfill hourly patterns: %v", err)
+		} else {
+			log.Println("Successfully backfilled hourly patterns data")
+		}
+	}
+
 	// Initialize components
 	pinger := ping.New()
 	mon := monitor.New(cfg, db, pinger)

@@ -14,6 +14,8 @@ type Database interface {
 	GetHeatmapData(days int) ([]HeatmapPoint, error)
 	GetPatterns(hour string) ([]PatternDetail, error)
 	AggregateHourlyPatterns() error
+	BackfillHourlyPatterns() error
+	IsHourlyPatternsEmpty() (bool, error)
 	ArchiveOldData() error
 	Close() error
 }
