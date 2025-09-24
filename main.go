@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"io/fs"
 	"log"
 	"os"
 	"os/signal"
@@ -48,10 +49,26 @@ func main() {
 		}
 	}
 
+	// Initialize static file system (embedded for production, filesystem for development)
+	var staticFS fs.FS
+	if cfg.DevMode {
+		// Development mode: serve from filesystem for live editing
+		staticFS = os.DirFS("static")
+		log.Println("Development mode: serving static files from filesystem (live editing enabled)")
+	} else {
+		// Production mode: use embedded files
+		var err error
+		staticFS, err = fs.Sub(staticFiles, "static")
+		if err != nil {
+			log.Fatalf("Failed to create static file system: %v", err)
+		}
+		log.Println("Production mode: serving embedded static files")
+	}
+
 	// Initialize components
 	pinger := ping.New()
 	mon := monitor.New(cfg, db, pinger)
-	webServer := web.New(db, cfg.Port, staticFiles)
+	webServer := web.New(db, cfg.Port, staticFS)
 
 	// Handle shutdown
 	sigChan := make(chan os.Signal, 1)

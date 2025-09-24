@@ -36,9 +36,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/heatmap", s.handleHeatmap)
 	mux.HandleFunc("/api/patterns", s.handlePatterns)
 
-	// Static files - serve embedded static/ directory as webroot
-	staticFS, _ := fs.Sub(s.staticFiles, "static")
-	mux.Handle("/", http.FileServer(http.FS(staticFS)))
+	// Static files - serve the provided static file system as webroot
+	mux.Handle("/", http.FileServer(http.FS(s.staticFiles)))
 
 	log.Printf("Web server starting on port %d", s.port)
 	return http.ListenAndServe(fmt.Sprintf(":%d", s.port), mux)

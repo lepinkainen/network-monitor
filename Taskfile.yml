@@ -86,9 +86,9 @@ tasks:
       - task: dev-go
 
   dev-go:
-    desc: Start Go development server
+    desc: Start Go development server with live static file editing
     cmds:
-      - go run .
+      - go run . --dev
 
   # Run the monitor
   run:

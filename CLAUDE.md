@@ -10,9 +10,9 @@ A Go-based network monitoring tool that performs continuous ping tests to detect
 
 ## Architecture & Entry Points
 
-- **Main Entry**: `cmd/monitor/main.go` - Orchestrates all components with graceful shutdown
+- **Main Entry**: `main.go` - Orchestrates all components with graceful shutdown
 - **Internal Structure**: Clean separation via `internal/` packages
-- **Static Assets**: Embedded via `//go:embed static/*` in main.go
+- **Static Assets**: Embedded via `//go:embed static/*` in main.go (production) or filesystem serving (development)
 - **Database**: SQLite with WAL mode for concurrent access
 
 ### Critical Components
@@ -45,11 +45,55 @@ internal/
 
 ```bash
 task build          # Build after tests+lint (required for deployment)
-task dev           # Development server (go run ./cmd/monitor)
+task dev           # Development server with live static file editing
 task test          # Run all tests
 task lint          # goimports + vet + golangci-lint
 task build-linux   # Cross-compile for Linux deployment
 ```
+
+### Development Mode for UI Work
+
+**Live Static File Editing**: The `task dev` command now enables live editing of HTML, CSS, and JavaScript files without server restarts.
+
+```bash
+task dev   # Runs: go run . --dev
+```
+
+**Development Mode Features**:
+- **Live HTML editing**: Changes to `static/index.html` visible on browser refresh
+- **Live CSS editing**: Modifications to `static/css/*.css` applied immediately
+- **Live JavaScript editing**: Updates to `static/js/*.js` served instantly from filesystem
+- **No server restart required**: Only browser refresh needed to see changes
+- **Production safety**: Build process unchanged, still uses embedded files
+
+**Development vs Production**:
+- **Development** (`--dev` flag): Serves files from `static/` directory (live editing)
+- **Production** (default): Uses embedded `//go:embed` files (compile-time)
+
+### UI Testing with Playwright
+
+**Automated UI Testing**: Use the general-purpose agent with Playwright browser automation for comprehensive UI testing.
+
+```bash
+# Start development server in background
+task dev
+
+# Use Task tool with browser automation to test UI changes
+# The agent can:
+# - Navigate to localhost:8080
+# - Take screenshots of UI components
+# - Test hover interactions on heatmap cells
+# - Verify responsive layout behavior
+# - Test different time range selections
+# - Validate tooltips and interactive elements
+```
+
+**UI Development Workflow**:
+1. Start development server: `task dev`
+2. Edit static files (HTML/CSS/JS) in your editor
+3. Refresh browser to see changes immediately
+4. Use Playwright agent to verify functionality
+5. Take screenshots for documentation/validation
 
 ### Pre-commit Requirements
 
@@ -91,8 +135,10 @@ if errors.Is(err, database.ErrOutageExists) {
 ### Static Assets
 
 - Single `static/index.html` with embedded D3.js
-- **Pattern**: All static files embedded at compile time
+- **Production Pattern**: All static files embedded at compile time via `//go:embed`
+- **Development Pattern**: Files served directly from filesystem for live editing
 - No build step for frontend - vanilla HTML/JS/CSS
+- **Live Development**: Use `task dev` for immediate UI changes without server restart
 
 ## Testing & CI/CD
 

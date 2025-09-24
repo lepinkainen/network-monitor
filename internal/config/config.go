@@ -12,6 +12,7 @@ type Config struct {
 	Timeout      time.Duration
 	DatabasePath string
 	Port         int
+	DevMode      bool // Enable development mode for live static file editing
 }
 
 // Validate checks if the configuration is valid

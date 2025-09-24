@@ -14,6 +14,7 @@ func ParseFlags() Config {
 		dbPath   = flag.String("db", "network_monitor.db", "Database path")
 		port     = flag.Int("port", 8080, "Web server port")
 		targets  = flag.String("targets", "8.8.8.8,1.1.1.1,208.67.222.222", "Comma-separated ping targets")
+		devMode  = flag.Bool("dev", false, "Enable development mode (live static file editing)")
 	)
 	flag.Parse()
 
@@ -23,5 +24,6 @@ func ParseFlags() Config {
 		Timeout:      *timeout,
 		DatabasePath: *dbPath,
 		Port:         *port,
+		DevMode:      *devMode,
 	}
 }
