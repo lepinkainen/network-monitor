@@ -1,25 +1,47 @@
-# Repository Guidelines
+# Agent Handbook
 
-## Project Structure & Module Organization
+## Project Structure & Core Modules
 
-Source code centers on `main.go` and the `internal/` tree. Key packages include `internal/monitor` for orchestrating workers, `internal/ping` for ICMP sampling, `internal/database` for SQLite access, and `internal/web` for the HTTP dashboard. Static web assets live in `static/`, build artifacts are written to `build/`, and generated reports land in `reports/` when created. Shared helper utilities reside under `llm-shared/`.
+Source code centers on `main.go` with feature logic under `internal/`. Key packages: `internal/monitor` for worker orchestration, `internal/ping` for ICMP sampling, `internal/database` for SQLite, and `internal/web` for the dashboard. Static assets live in `static/`, build artefacts in `build/`, generated reports in `reports/`, and shared automation aids in `llm-shared/`.
 
-## Build, Test, and Development Commands
+## Build, Test, and Runtime Commands
 
-Use `task build` for a full build with linting and unit tests, or `task build-linux` when cross-compiling for Linux. Run `task dev` (or `go run . --dev`) to launch the dashboard with live assets. `task lint` enforces format and vetting, while `task clean` resets the `build/` directory. For containerized runs, prefer `docker-compose up --build` and stop with `docker-compose down`.
+Run `task build` before claiming work complete; it wraps linting, tests, and the build. Use `task build-linux` for cross-compiles, `task lint` to enforce formatting/vetting, `task clean` to reset `build/`, and `task dev` (or `go run . --dev`) for the live dashboard. For containers, prefer `docker-compose up --build` / `docker-compose down`.
 
-## Coding Style & Naming Conventions
+## Git & Workflow Norms
 
-Target Go 1.21. Run `goimports -w .` before commits; it formats code and fixes imports. Keep packages lower_snake_case and exported symbols in PascalCase with concise doc comments where behavior is non-obvious. Limit files to focused responsibilities; prefer splitting helpers into the existing `internal/*` domains rather than adding new top-level folders.
+- Never commit directly to `main`/`master`; develop on feature branches and keep commits focused.
+- Rebase before merge, rely on pull requests for review, and close the loop with linked tracking issues.
+- When working from checklists, tick items as you go and treat a task as complete only once `task build` passes and tests exist for the new logic.
 
-## Testing Guidelines
+## Coding Style & Language Guidance
 
-Unit tests live alongside code (e.g., `internal/ping/ping_test.go`). Execute `task test` or `go test ./...` before pushing; CI expects clean runs. For coverage-sensitive work, run `task test-ci` to mirror pipeline settings. Name tests with the behavior under test (`TestWorkerHandlesTimeout`) and favor table-driven cases to clarify target/interval permutations.
+Target Go 1.21 in this repo, but align with the broader Go practices in `llm-shared/languages/go.md`: prefer the latest stable Go toolchain (currently 1.24), use `goimports -w .` for formatting/imports, justify third-party deps, and lean on standard library packages. Keep packages lower_snake_case, exported identifiers in PascalCase, and split oversized files across focused modules.
 
-## Commit & Pull Request Guidelines
+## Testing Expectations
 
-Follow Conventional Commits (`feat:`, `fix:`, `refactor:`) as shown in `git log`. Keep PRs focused, include a brief summary of monitoring or UI impacts, and link tracking issues. Add screenshots for UI-facing changes or mention CLI output for report generation tweaks. Confirm docs stay current when touch points like `Taskfile.yml` or `static/` change.
+Collocate tests with code (e.g. `internal/ping/ping_test.go`). Run `task test` or `go test ./...` prior to push; CI mirrors this through `task test-ci`. Write table-driven tests with descriptive names like `TestWorkerHandlesTimeout`, and ensure even small changes land with basic coverage.
+
+## Commit & PR Conventions
+
+Use Conventional Commits (`feat:`, `fix:`, `refactor:`). Summarise monitoring/UI impact in PRs, attach screenshots or CLI output when user-facing, and audit docs whenever touching pieces like `Taskfile.yml` or `static/`.
+
+## LLM Shared Resources
+
+- `llm-shared/README.md` points to shared playbooks. Review it at the start of an engagement.
+- `llm-shared/project_tech_stack.md` covers repository hygiene: branch policy, Gemini CLI usage for large-code analysis, and the `validate-docs` workflow.
+- `llm-shared/GITHUB.md` documents `gh` CLI flows for managing issues/labels; bootstrap recommended labels with `./llm-shared/create-gh-labels.sh`.
+- `llm-shared/shell_commands.md` standardises shell tooling (`rg`, `fd`, etc.).
+- Language primers in `llm-shared/languages/` hold deeper Go/Python/JavaScript notes; consult `go.md` for dependency policy, lint setup, and CI expectations.
+
+## Shared Utilities & Templates
+
+Automation helpers live under `llm-shared/utils/`: the Go/Python/JS function listers (`gofuncs`, `pyfuncs`, `jsfuncs`) aid rapid code discovery, while `validate-docs` checks repo structure. Template assets in `llm-shared/templates/` supply starter configs for Taskfiles, CI workflows, changelogs, and language-aware `.gitignore` variants.
+
+## Shell & Tooling Expectations
+
+Prefer the modern command set: `rg` over `grep`, `fd` over `find`, and embrace context-friendly flags (see `llm-shared/shell_commands.md`). Respect `.gitignore` defaults, use glob filters, and rely on these tools for fast code searches and batch operations.
 
 ## Operations & Configuration Notes
 
-Runtime configuration is pulled from flags and files under `config/`. SQLite data defaults to `network_monitor.db`; keep it out of commits. When generating reports via `task report`, ensure `build/network-monitor` exists. Coordinate schema or retention tweaks with the reporting charts so PNG exports remain accurate.
+Runtime configuration comes from CLI flags and files in `config/`. SQLite state lives in `network_monitor.db`; keep database files out of commits. Before `task report`, ensure `build/network-monitor` exists. Coordinate schema or retention updates with reporting charts so exported PNGs stay accurate. Any running web service must expose `/whoami` with project metadata, and existing processes should be identified via that endpoint before restarting or terminating them.
