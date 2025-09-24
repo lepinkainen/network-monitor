@@ -30,7 +30,6 @@ func (m *Monitor) performPing(target string) {
 	result, err := m.pinger.Ping(target, m.config.Timeout)
 	if err != nil {
 		log.Printf("Failed to ping %s: %v", target, err)
-		return
 	}
 
 	select {

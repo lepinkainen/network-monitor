@@ -1,10 +1,13 @@
 package ping
 
 import (
+	"context"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"network-monitor/internal/models"
@@ -21,36 +24,73 @@ func New() *Pinger {
 // Ping executes a ping to the target and returns the result
 func (p *Pinger) Ping(target string, timeout time.Duration) (models.PingResult, error) {
 	result := models.PingResult{
-		Timestamp: time.Now(),
-		Target:    target,
+		Timestamp:  time.Now(),
+		Target:     target,
+		PacketLoss: 100,
 	}
 
-	// Platform-specific ping command
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("ping", "-n", "1", "-w", strconv.Itoa(int(timeout.Milliseconds())), target)
-	} else {
-		cmd = exec.Command("ping", "-c", "1", "-W", strconv.Itoa(int(timeout.Seconds())), target)
-	}
+	normalizedTimeout := normalizeTimeout(timeout)
+	contextTimeout := normalizedTimeout + 500*time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+	defer cancel()
 
+	cmd := exec.CommandContext(ctx, "ping", buildPingArgs(target, normalizedTimeout)...)
 	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+
+	if ctx.Err() == context.DeadlineExceeded {
+		result.ErrorMessage = fmt.Sprintf("ping timed out after %s", normalizedTimeout)
+		return result, ctx.Err()
+	}
 
 	if err != nil {
-		result.Success = false
-		result.ErrorMessage = err.Error()
-		result.RTT = parsePingOutput(string(output)) // Try to parse even on error
-	} else {
-		result.Success = true
-		result.RTT = parsePingOutput(string(output))
+		result.ErrorMessage = strings.TrimSpace(outputStr)
+		if result.ErrorMessage == "" {
+			result.ErrorMessage = err.Error()
+		}
+		return result, err
 	}
 
-	// Debug: log output if parsing failed
-	if result.Success && result.RTT == 0 {
-		// This is for debugging - in production this would be removed
-		_ = output // avoid unused variable warning
+	rtt := parsePingOutput(outputStr)
+	if rtt <= 0 {
+		result.ErrorMessage = "unable to parse round-trip time"
+		return result, fmt.Errorf("unable to parse ping output: %s", strings.TrimSpace(outputStr))
 	}
 
+	result.Success = true
+	result.PacketLoss = 0
+	result.RTT = rtt
 	return result, nil
+}
+
+func normalizeTimeout(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return time.Second
+	}
+	return timeout
+}
+
+func buildPingArgs(target string, timeout time.Duration) []string {
+	switch runtime.GOOS {
+	case "windows":
+		ms := int(timeout / time.Millisecond)
+		if ms < 1 {
+			ms = 1
+		}
+		return []string{"-n", "1", "-w", strconv.Itoa(ms), target}
+	case "darwin":
+		ms := int(timeout / time.Millisecond)
+		if ms < 1 {
+			ms = 1
+		}
+		return []string{"-n", "-c", "1", "-W", strconv.Itoa(ms), target}
+	default:
+		secs := int((timeout + time.Second - 1) / time.Second)
+		if secs < 1 {
+			secs = 1
+		}
+		return []string{"-n", "-c", "1", "-W", strconv.Itoa(secs), target}
+	}
 }
 
 // parsePingOutput parses RTT from ping output
