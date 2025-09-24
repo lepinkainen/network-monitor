@@ -1,6 +1,8 @@
 package monitor
 
 import (
+	"context"
+	"errors"
 	"log"
 	"time"
 )
@@ -28,7 +30,7 @@ func (m *Monitor) pingWorker(target string) {
 // performPing executes a single ping and sends the result to the results channel
 func (m *Monitor) performPing(target string) {
 	result, err := m.pinger.Ping(target, m.config.Timeout)
-	if err != nil {
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		log.Printf("Failed to ping %s: %v", target, err)
 	}
 
