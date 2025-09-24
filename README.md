@@ -13,20 +13,70 @@ A focused ping-based network monitoring solution designed for long-term monitori
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Option 1: Using Docker (Recommended)
+
+#### Prerequisites
+
+- Docker and Docker Compose installed
+
+#### 1. Clone and navigate to the project
+
+```bash
+cd /Users/shrike/projects/network-monitor
+```
+
+#### 2. Build and run with Docker Compose
+
+```bash
+# Build and start the container
+docker-compose up --build
+
+# Or run in detached mode
+docker-compose up -d --build
+```
+
+#### 3. Access the Dashboard
+
+Open your browser to: <http://localhost:8080>
+
+#### 4. Stop the container
+
+```bash
+docker-compose down
+```
+
+#### Docker Configuration
+
+- **Database**: Persisted in `./data/network_monitor.db` on host
+- **Port**: 8080 (configurable via docker-compose.yml)
+- **Health Check**: Automatic monitoring of web interface
+- **Auto-restart**: Container restarts automatically unless stopped
+
+#### Custom Configuration
+
+Create a `config` directory and add configuration files, then mount them:
+
+```yaml
+volumes:
+  - ./config:/app/config:ro
+```
+
+### Option 2: Native Installation
+
+#### 1. Install Dependencies
 
 ```bash
 cd /Users/shrike/projects/network-monitor
 go mod download
 ```
 
-### 2. Build the Application
+#### 2. Build the Application
 
 ```bash
 go build -o network-monitor *.go
 ```
 
-### 3. Find Your ISP Gateway (Optional but Recommended)
+#### 3. Find Your ISP Gateway (Optional but Recommended)
 
 ```bash
 # On macOS/Linux:
@@ -35,7 +85,7 @@ traceroute 8.8.8.8 | head -2
 # The first external hop is typically your ISP gateway
 ```
 
-### 4. Run the Monitor
+#### 4. Run the Monitor
 
 ```bash
 # With default targets (Google DNS, Cloudflare, OpenDNS)
@@ -48,7 +98,7 @@ traceroute 8.8.8.8 | head -2
 ./network-monitor -interval 60s
 ```
 
-### 5. Access the Dashboard
+#### 5. Access the Dashboard
 
 Open your browser to: <http://localhost:8080>
 

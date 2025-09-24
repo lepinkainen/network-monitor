@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  network-monitor:
+    build: .
+    container_name: network-monitor
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount host directory for persistent database storage
+      - ./data:/app/data
+      # Mount host directory for any additional configuration if needed
+      - ./config:/app/config:ro
+    environment:
+      - DB_PATH=/app/data/network_monitor.db
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - network-monitor
+
+networks:
+  network-monitor:
+    driver: bridge
+
+volumes:
+  database:
+    driver: local
