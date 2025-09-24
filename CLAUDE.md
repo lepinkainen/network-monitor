@@ -60,6 +60,7 @@ task dev   # Runs: go run . --dev
 ```
 
 **Development Mode Features**:
+
 - **Live HTML editing**: Changes to `static/index.html` visible on browser refresh
 - **Live CSS editing**: Modifications to `static/css/*.css` applied immediately
 - **Live JavaScript editing**: Updates to `static/js/*.js` served instantly from filesystem
@@ -67,6 +68,7 @@ task dev   # Runs: go run . --dev
 - **Production safety**: Build process unchanged, still uses embedded files
 
 **Development vs Production**:
+
 - **Development** (`--dev` flag): Serves files from `static/` directory (live editing)
 - **Production** (default): Uses embedded `//go:embed` files (compile-time)
 
@@ -89,6 +91,7 @@ task dev
 ```
 
 **UI Development Workflow**:
+
 1. Start development server: `task dev`
 2. Edit static files (HTML/CSS/JS) in your editor
 3. Refresh browser to see changes immediately
