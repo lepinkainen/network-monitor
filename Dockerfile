@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o monitor ./cmd/monitor
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o monitor .
 
 # Runtime stage
 FROM alpine:latest

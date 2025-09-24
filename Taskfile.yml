@@ -60,7 +60,7 @@ tasks:
     desc: Build Go project
     cmds:
       - mkdir -p {{.BUILD_DIR}}
-      - go build -o {{.BUILD_DIR}}/{{.PROJECT_NAME}} ./cmd/monitor
+      - go build -o {{.BUILD_DIR}}/{{.PROJECT_NAME}} .
 
   test-go:
     desc: Run Go tests
@@ -88,7 +88,7 @@ tasks:
   dev-go:
     desc: Start Go development server
     cmds:
-      - go run ./cmd/monitor
+      - go run .
 
   # Run the monitor
   run:
