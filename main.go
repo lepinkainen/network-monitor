@@ -20,8 +20,11 @@ var staticFiles embed.FS
 
 func main() {
 	// Parse configuration
-	cfg := config.ParseFlags()
-	if err := cfg.Validate(); err != nil {
+	cfg, err := config.ParseFlags()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+	if err = cfg.Validate(); err != nil {
 		log.Fatalf("Invalid configuration: %v", err)
 	}
 

@@ -13,8 +13,17 @@ func (m *Monitor) maintenanceWorker() {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 
-	// Run immediately on start
-	m.performMaintenance()
+	// Wait 60 seconds before first maintenance to avoid startup race conditions
+	startupDelay := time.NewTimer(60 * time.Second)
+	defer startupDelay.Stop()
+
+	// Wait for startup delay before running first maintenance
+	select {
+	case <-m.ctx.Done():
+		return
+	case <-startupDelay.C:
+		m.performMaintenance()
+	}
 
 	for {
 		select {

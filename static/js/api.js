@@ -73,9 +73,9 @@ async function showPatternDetails(hour) {
 
       targetPatterns.slice(0, 10).forEach((p) => {
         const rowClass =
-          p.failure_rate > 10
+          p.failure_rate > 1
             ? 'style="background: #fee;"'
-            : p.failure_rate > 5
+            : p.failure_rate > 0.5
             ? 'style="background: #ffc;"'
             : "";
         html += `<tr ${rowClass}>

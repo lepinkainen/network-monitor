@@ -109,6 +109,17 @@ Open your browser to: <http://localhost:8080>
 - `-timeout`: Ping timeout (default: 5s)  
 - `-db`: Database path (default: "network_monitor.db")
 - `-port`: Web server port (default: 8080)
+- `-config`: Path to YAML config file (default: `config/config.yml` when present)
+
+## Configuration File
+
+You can keep environment-specific settings (like private targets) out of version control by using a YAML config file:
+
+1. Copy `config/config.sample.yml` to `config/config.yml`.
+2. Edit `targets` (and any optional overrides) for your network.
+3. Run the app normally—if `config/config.yml` exists it overrides the flag defaults. You can also point to another file with `-config /path/to/file.yml`.
+
+Fields not specified in the YAML fall back to the CLI defaults, and CLI flags still win if you pass them explicitly.
 
 ## Dashboard Features
 

@@ -24,6 +24,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Local configuration
+config/config.yml
+
 # Go dependencies
 vendor/
 
@@ -31,4 +34,3 @@ vendor/
 *.test
 *.out
 .playwright-mcp/
-

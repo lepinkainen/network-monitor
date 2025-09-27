@@ -51,7 +51,7 @@ function drawHeatmap() {
   // Color scale for failure rate
   const colorScale = d3
     .scaleSequential()
-    .domain([0, 20]) // 0-20% failure rate
+    .domain([0, 2]) // 0-2% failure rate
     .interpolator(d3.interpolateRgb("#10b981", "#ef4444"))
     .clamp(true);
 
@@ -108,21 +108,7 @@ function drawHeatmap() {
       showPatternDetails(d.hour);
     });
 
-  // Add text labels for significant issues
-  g.selectAll(".issue-label")
-    .data(heatmapData.filter((d) => d.failure_rate > 10))
-    .enter()
-    .append("text")
-    .attr("class", "issue-label")
-    .attr("x", (d) => xScale(d.hour) + xScale.bandwidth() / 2)
-    .attr("y", (d) => yScale(d.target) + yScale.bandwidth() / 2)
-    .attr("text-anchor", "middle")
-    .attr("dominant-baseline", "middle")
-    .style("fill", "white")
-    .style("font-size", "10px")
-    .style("font-weight", "bold")
-    .style("pointer-events", "none")
-    .text((d) => Math.round(d.failure_rate) + "%");
+  // Remove text labels - color is sufficient indication
 
   // X-axis (hours)
   g.append("g")
@@ -154,7 +140,7 @@ function drawHeatmap() {
   const legendWidth = 100;
   const legendHeight = 20;
 
-  const legendScale = d3.scaleLinear().domain([0, 20]).range([0, legendWidth]);
+  const legendScale = d3.scaleLinear().domain([0, 2]).range([0, legendWidth]);
 
   const legendAxis = d3
     .axisBottom(legendScale)
@@ -181,7 +167,7 @@ function drawHeatmap() {
     gradient
       .append("stop")
       .attr("offset", stop * 100 + "%")
-      .attr("stop-color", colorScale(stop * 20));
+      .attr("stop-color", colorScale(stop * 2));
   });
 
   legend

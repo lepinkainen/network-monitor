@@ -1,0 +1,15 @@
+# Copy this file to config/config.yml and edit values to suit your network.
+# Any values omitted fall back to the CLI defaults in internal/config/flags.go.
+
+# List of IP addresses or hostnames to probe.
+targets:
+  - 8.8.8.8
+  - 1.1.1.1
+  - 208.67.222.222
+
+# Optional overrides
+# interval: 1s
+# timeout: 5s
+# database_path: network_monitor.db
+# port: 8080
+# dev_mode: false

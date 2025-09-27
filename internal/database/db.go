@@ -14,14 +14,16 @@ type DB struct {
 
 // New creates a new database connection
 func New(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path)
+	// Use DSN with embedded pragmas to ensure all connections get proper settings
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(15000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)", path)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("database open failed: %w", err)
 	}
 
-	// Enable WAL mode for better concurrent access
-	db.Exec("PRAGMA journal_mode=WAL")
-	db.Exec("PRAGMA synchronous=NORMAL")
+	// Serialize all database access to eliminate SQLITE_BUSY errors
+	db.SetMaxOpenConns(1) // Only one connection at a time
+	db.SetMaxIdleConns(1) // Keep connection alive for reuse
 
 	return &DB{db}, nil
 }
