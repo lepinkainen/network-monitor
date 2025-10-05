@@ -50,6 +50,14 @@ func (m *Monitor) processResults() {
 		case <-m.ctx.Done():
 			return
 		case result := <-m.results:
+			// Log failed pings to console for live monitoring
+			if !result.Success {
+				log.Printf("PING FAILED: %s at %s - %s",
+					result.Target,
+					result.Timestamp.Format("15:04:05"),
+					result.ErrorMessage)
+			}
+
 			if err := m.db.SaveResult(result); err != nil {
 				log.Printf("Failed to save result: %v", err)
 			}
