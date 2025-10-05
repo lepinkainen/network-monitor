@@ -81,6 +81,10 @@ func (db *DB) InitSchema() error {
     );
 
     CREATE INDEX IF NOT EXISTS idx_hourly_patterns ON hourly_patterns(hour, target);
+    CREATE INDEX IF NOT EXISTS idx_hourly_patterns_date ON hourly_patterns(date);
+    CREATE INDEX IF NOT EXISTS idx_hourly_patterns_hour_date ON hourly_patterns(hour, date);
+    CREATE INDEX IF NOT EXISTS idx_ping_success_timestamp ON ping_results(success, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_outages_start_time ON outages(start_time);
     `
 
 	if _, err := db.Exec(schema); err != nil {
