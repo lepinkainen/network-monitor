@@ -89,7 +89,7 @@ func main() {
 		}
 	}()
 
-	log.Printf("Monitor started. Pinging %v every %v", cfg.Targets, cfg.Interval)
+	log.Printf("Monitoring started. Pinging %v every %v", cfg.Targets, cfg.Interval)
 	log.Printf("Web interface available at http://localhost:%d", cfg.Port)
 
 	<-sigChan

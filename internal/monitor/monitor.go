@@ -53,7 +53,7 @@ func (m *Monitor) Start() error {
 	m.wg.Add(1)
 	go m.maintenanceWorker()
 
-	log.Printf("Monitor started. Pinging %v every %v", m.config.Targets, m.config.Interval)
+	log.Printf("Monitor process started. Pinging %v every %v", m.config.Targets, m.config.Interval)
 	return nil
 }
 
